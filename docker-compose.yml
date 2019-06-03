@@ -1,0 +1,67 @@
+version: '3.7'
+
+services:
+  redis:
+    image: redis:5-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    deploy:
+      mode: replicated
+      replicas: 1
+  postgres:
+    image: maronato/bpostgres:11
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/pgdata
+      - postgres_backups:/backups
+    ports:
+      - "6379:6379"
+    deploy:
+      mode: replicated
+      replicas: 1
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+  grafana:
+    build:
+      context: ./grafana
+    volumes:
+      - grafana_data:/data
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_LOG_LEVEL=debug
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=admin
+    deploy:
+      mode: replicated
+      replicas: 1
+    depends_on:
+      - prometheus
+  prometheus:
+    build:
+      context: ./prometheus
+    volumes:
+      - prometheus_data:/data
+    deploy:
+      mode: replicated
+      replicas: 1
+  redis-exporter:
+    image: oliver006/redis_exporter
+    command:
+      - '--redis.addr=redis://redis:6379'
+    depends_on:
+      - redis
+      - prometheus
+  node-exporter:
+    image: prom/node-exporter:latest
+    depends_on:
+      - prometheus
+
+volumes:
+  redis_data:
+  postgres_data:
+  postgres_backups:
+  grafana_data:
+  prometheus_data:
